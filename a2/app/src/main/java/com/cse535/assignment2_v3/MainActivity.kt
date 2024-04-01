@@ -3,6 +3,7 @@ package com.cse535.assignment2_v3
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
+import android.graphics.Color.parseColor
 import android.icu.text.SimpleDateFormat
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -82,8 +83,9 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(dbinstance: TemperatureDatabase){
-    var lat = 0.0; var long = 0.0
+    val lat = 0.0; val long = 0.0
     val context = LocalContext.current
+    val calInput = true
     var maxTemp by remember { mutableStateOf(0.0) }
     var minTemp by remember { mutableStateOf(0.0) }
     var errorFlag = false
@@ -95,8 +97,6 @@ fun MainScreen(dbinstance: TemperatureDatabase){
         if (selectedTimestamp != null) {
             selectedDate = getDateFromTimestamp(selectedTimestamp)
         }
-        // check if internet is available
-
 
         val coroutineScope = rememberCoroutineScope()
 
@@ -144,9 +144,7 @@ fun MainScreen(dbinstance: TemperatureDatabase){
             }
         }
 
-        else if (maxTemp == Double.NaN && minTemp == Double.NaN){
-            Text("Error fetching data")
-        }
+
         else if (maxTemp == -1.0 && minTemp == -1.0){
             Text("Fetching data...")
         }
@@ -164,11 +162,21 @@ fun MainScreen(dbinstance: TemperatureDatabase){
 
         if (!errorFlag){
             if (maxTemp.isNaN() || minTemp.isNaN()){
-                Text("Fetching and Processing data...")
+                Box(modifier = Modifier.size(300.dp, 100.dp)
+                    .background(Color.Gray, shape = RoundedCornerShape(10.dp))
+                , contentAlignment = Alignment.Center){
+                    Text("Fetching and Processing data...", fontWeight = FontWeight.Bold)
+                }
             }
             else{
-            Text("Max Temperature: %.2f °C".format(maxTemp))
-            Text("Min Temperature: %.2f °C".format(minTemp))
+                Box(modifier = Modifier.size(300.dp, 100.dp)
+                    .padding(16.dp)
+                    .background(Color(parseColor("#d2fadf")), shape = RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center){
+                    Column(modifier = Modifier.padding(10.dp)){
+                Text("Max Temperature: %.2f °C".format(maxTemp))
+                Text("Min Temperature: %.2f °C".format(minTemp))}
+                }
             }
         }
 
@@ -379,4 +387,37 @@ fun checkConnectivity(context: Context): Boolean{
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
     return false
+}
+
+fun checkDateValid(date: String): Boolean{
+    try{
+        val ymd = date.split("/")
+        val year = ymd[0].toInt()
+        val month = ymd[1].toInt()
+        val day = ymd[2].toInt()
+        if (day < 1 || day > 31 || month < 1 || month > 12 || year < 0){
+            return false
+        }
+        if (month == 2){
+            if ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0){
+                if (day > 29){
+                    return false
+                }
+            }
+            else{
+                if (day > 28){
+                    return false
+                }
+            }
+        }
+        if (month == 4 || month == 6 || month == 9 || month == 11){
+            if (day > 30){
+                return false
+            }
+        }
+        return true
+    }
+    catch (e: Exception){
+        return false
+    }
 }
