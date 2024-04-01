@@ -98,7 +98,8 @@ fun MainScreen(dbinstance: TemperatureDatabase){
             val apiMode = connectivity
 
             val currTimestamp = System.currentTimeMillis()
-            if (selectedTimestamp > currTimestamp){
+            val currDayTimestamp = currTimestamp - (currTimestamp % 86400000)
+            if (selectedTimestamp >= currDayTimestamp){
                 Log.d("tag1", "Selected date is in the future")
                 maxTemp = Double.NaN
                 minTemp = Double.NaN
@@ -114,18 +115,22 @@ fun MainScreen(dbinstance: TemperatureDatabase){
                     maxTemp = r1.first
                     minTemp = r1.second
                     Log.d("tag2", "${r1.toString()}")
-                    Log.d("tag2", "maxTemp: $maxTemp, minTemp: $minTemp")
+                    Log.d("tag2", "maxTemp: ${maxTemp}, minTemp: $minTemp")
                 }
             }
         }) {
             Text("Get Temperature")
         }
+        if (maxTemp == Double.NaN || minTemp == Double.NaN){
+            Text("Max Temperature: N/A")
+            Text("Min Temperature: N/A")
+        }
+        else{
+            Text("Max Temperature: %.2f".format(maxTemp))
+            Text("Min Temperature: %.2f".format(minTemp))
+        }
+    }
 
-    }
-    Column(modifier = Modifier.padding(10.dp)) {
-        Text("Max Temp: $maxTemp")
-        Text("Min Temp: $minTemp")
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -137,7 +142,7 @@ fun SelectDate(datePickerState: DatePickerState){
             state = datePickerState,
             //modifier = Modifier.padding(16.dp)
         )
-        Text("Selected date timestamp: ${datePickerState.selectedDateMillis ?: "no selection"}")
+
     }
 }
 
@@ -168,7 +173,6 @@ suspend fun getTemperature(dbinstance: TemperatureDatabase, latitude: Double, lo
                 }
             }
         }
-
 
     }
     return Pair(Double.NaN, Double.NaN)
@@ -281,7 +285,7 @@ private suspend fun getTemperaturesFromDB(dbinstance: TemperatureDatabase, date:
     }
     temp?.let{
         Log.d("tag_fetch", temp.toString())
-        res = Pair(temp.minTemperature, temp.maxTemperature)
+        res = Pair(temp.maxTemperature, temp.minTemperature)
     }
     return res
 }
