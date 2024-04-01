@@ -10,9 +10,14 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement.Center
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerState
@@ -27,8 +32,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -77,7 +86,8 @@ fun MainScreen(dbinstance: TemperatureDatabase){
     val context = LocalContext.current
     var maxTemp by remember { mutableStateOf(0.0) }
     var minTemp by remember { mutableStateOf(0.0) }
-    Column(modifier = Modifier.padding(10.dp)){
+    var errorFlag = false
+    Column(modifier = Modifier.padding(10.dp), horizontalAlignment = CenterHorizontally){
         var datePickerState = rememberDatePickerState()
         SelectDate(datePickerState)
         var selectedTimestamp = datePickerState.selectedDateMillis
@@ -123,14 +133,45 @@ fun MainScreen(dbinstance: TemperatureDatabase){
         }) {
             Text("Get Temperature")
         }
-        if (maxTemp == Double.NaN || minTemp == Double.NaN){
-            Text("Max Temperature: N/A")
-            Text("Min Temperature: N/A")
+        if (maxTemp == -2.0 && minTemp == -2.0){
+            errorFlag = true
+            //Text("Data not found in DB", textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = Color.Red)
+            Box(modifier = Modifier.padding(10.dp)
+                .size(300.dp, 100.dp)
+                .background(Color.Red, shape = RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center)
+            {
+                Text("Data not found in DB", color = Color.White, fontWeight = FontWeight.Bold)
+            }
         }
-        else{
+
+        else if (maxTemp == Double.NaN && minTemp == Double.NaN){
+            Text("Error fetching data")
+        }
+        else if (maxTemp == -1.0 && minTemp == -1.0){
+            Text("Fetching data...")
+        }
+
+        else if (maxTemp == -3.0 || minTemp == -3.0){
+            errorFlag = true
+            //Text("Error fetching data", textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = Color.Red)
+            Box(modifier = Modifier.padding(10.dp)
+                .size(300.dp, 100.dp)
+                .background(Color.Red, shape = RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center)
+            {
+                Text("Error fetching data from API", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        if (!errorFlag){
+            if (maxTemp.isNaN() || minTemp.isNaN()){
+                Text("Fetching and Processing data...")
+            }
+            else{
             Text("Max Temperature: %.2f °C".format(maxTemp))
             Text("Min Temperature: %.2f °C".format(minTemp))
+            }
         }
+
     }
 
 }
@@ -188,6 +229,8 @@ private suspend fun predictTemperature(dbinstance: TemperatureDatabase, latitude
     // get data for the same date in the 10 previous years
     val maxTempList = mutableListOf<Double>()
     val minTempList = mutableListOf<Double>()
+    var apiError = false
+    var dbError = false
     for (i in 1..10) {
         val prevYear = currYear - i
         val prevDate = "$prevYear${date.substring(4)}"
@@ -209,12 +252,29 @@ private suspend fun predictTemperature(dbinstance: TemperatureDatabase, latitude
         }
         maxTempList.add(temperatures.first)
         minTempList.add(temperatures.second)
+        if (temperatures.first == -3.0 || temperatures.second == -3.0){
+            apiError = true
+            break
+        }
+        if (temperatures.first == -2.0 || temperatures.second == -2.0){
+            dbError = true
+            break
+        }
 
     }
     // calculate the average of the max and min temperatures
-    val maxTempAvg = maxTempList.average()
-    val minTempAvg = minTempList.average()
-    return Pair(maxTempAvg, minTempAvg)
+    if (!apiError && !dbError){
+        val maxTempAvg = maxTempList.average()
+        val minTempAvg = minTempList.average()
+        return Pair(maxTempAvg, minTempAvg)
+    }
+    else if (dbError){
+        return Pair(-2.0, -2.0)
+    }
+    else{
+        return Pair(-3.0, -3.0)
+    }
+
 }
 
 
@@ -253,16 +313,16 @@ fun getTemperaturesFromAPI(dbinstance: TemperatureDatabase,latitude: Double, lon
 
 
                 } else {
-                    callback(Pair(Double.NaN, Double.NaN))
+                    callback(Pair(-3.0, -3.0))
                 }
             } else {
-                callback(Pair(Double.NaN, Double.NaN))
+                callback(Pair(-3.0, -3.0))
             }
         }
 
         override fun onFailure(call: Call<Result>, t: Throwable) {
             Log.e("API_ERROR", "Error making API request: ${t.message}")
-            callback(Pair(Double.NaN, Double.NaN))
+            callback(Pair(-3.0, -3.0))
         }
     })
 
@@ -288,6 +348,10 @@ private suspend fun getTemperaturesFromDB(dbinstance: TemperatureDatabase, date:
     temp?.let{
         Log.d("tag_fetch", temp.toString())
         res = Pair(temp.maxTemperature, temp.minTemperature)
+    }
+    if (res.first.isNaN() || res.second.isNaN()){
+        Log.d("tag_fetch", "Data not found in DB")
+        res = Pair(-2.0, -2.0)
     }
     return res
 }
