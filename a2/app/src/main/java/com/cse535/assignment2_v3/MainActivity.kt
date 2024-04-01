@@ -91,6 +91,8 @@ fun MainScreen(dbinstance: TemperatureDatabase){
         val coroutineScope = rememberCoroutineScope()
 
         Button(onClick = {
+            maxTemp = Double.NaN
+            minTemp = Double.NaN
             if (selectedTimestamp == null) {
                 return@Button
             }
@@ -126,8 +128,8 @@ fun MainScreen(dbinstance: TemperatureDatabase){
             Text("Min Temperature: N/A")
         }
         else{
-            Text("Max Temperature: %.2f".format(maxTemp))
-            Text("Min Temperature: %.2f".format(minTemp))
+            Text("Max Temperature: %.2f °C".format(maxTemp))
+            Text("Min Temperature: %.2f °C".format(minTemp))
         }
     }
 
